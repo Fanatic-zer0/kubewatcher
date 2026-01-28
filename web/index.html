@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K8sWatcher - Kubernetes Change Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Dark mode initialization (before page renders)
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white dark:bg-gray-800 shadow">
+            <div class="max-w-7xl mx-auto px-4 py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">📊 K8sWatcher</h1>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Kubernetes Change Tracker</p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <button onclick="toggleDarkMode()" class="px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white" title="Toggle dark mode">
+                            <span class="dark:hidden">🌙</span>
+                            <span class="hidden dark:inline">☀️</span>
+                        </button>
+                        <span id="autoRefresh" class="text-sm text-gray-600 dark:text-gray-400">
+                            Auto-refresh: <span id="countdown">10</span>s
+                        </span>
+                        <button onclick="loadData()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            🔄 Refresh Now
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Cards -->
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                    <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Changes</div>
+                    <div class="text-3xl font-bold text-gray-900 dark:text-white" id="totalChanges">-</div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                    <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Last 24 Hours</div>
+                    <div class="text-3xl font-bold text-blue-600" id="changes24h">-</div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                    <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Changes/Hour</div>
+                    <div class="text-3xl font-bold text-green-600" id="changesPerHour">-</div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                    <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Recent Images</div>
+                    <div class="text-3xl font-bold text-purple-600" id="recentImagesCount">-</div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
+                <div class="border-b border-gray-200 dark:border-gray-700">
+                    <nav class="flex -mb-px overflow-x-auto">
+                        <button onclick="switchTab('deployments')" id="tab-deployments" class="tab-button active px-6 py-3 text-sm font-medium border-b-2 border-blue-600 text-blue-600 whitespace-nowrap">
+                            🚀 Deployments
+                        </button>
+                        <button onclick="switchTab('statefulsets')" id="tab-statefulsets" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 whitespace-nowrap">
+                            💾 StatefulSets
+                        </button>
+                        <button onclick="switchTab('daemonsets')" id="tab-daemonsets" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 whitespace-nowrap">
+                            👹 DaemonSets
+                        </button>
+                        <button onclick="switchTab('services')" id="tab-services" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 whitespace-nowrap">
+                            🌐 Services
+                        </button>
+                        <button onclick="switchTab('ingresses')" id="tab-ingresses" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 whitespace-nowrap">
+                            🚪 Ingresses
+                        </button>
+                        <button onclick="switchTab('cronjobs')" id="tab-cronjobs" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 whitespace-nowrap">
+                            ⏰ CronJobs
+                        </button>
+                        <button onclick="switchTab('jobs')" id="tab-jobs" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 whitespace-nowrap">
+                            ⚙️ Jobs
+                        </button>
+                        <button onclick="switchTab('configmaps')" id="tab-configmaps" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 whitespace-nowrap">
+                            📝 ConfigMaps
+                        </button>
+                        <button onclick="switchTab('secrets')" id="tab-secrets" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 whitespace-nowrap">
+                            🔐 Secrets
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Filters -->
+                <div class="p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <input type="text" id="filterNamespace" placeholder="Filter by namespace..." 
+                               class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                               onchange="applyFilters()">
+                        <input type="text" id="filterName" placeholder="Search by name..." 
+                               class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                               onchange="applyFilters()">
+                        <select id="filterAction" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                onchange="applyFilters()">
+                            <option value="">All Actions</option>
+                            <option value="ADDED">Added</option>
+                            <option value="MODIFIED">Modified</option>
+                            <option value="DELETED">Deleted</option>
+                        </select>
+                        <button onclick="clearFilters()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600">
+                            Clear Filters
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Events Table -->
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-100 dark:bg-gray-900">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Namespace</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Change</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="eventsTable" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            <tr>
+                                <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                    Loading events...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Pagination -->
+                <div id="pagination"></div>
+            </div>
+
+            <!-- Top Modified Apps -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">📈 Top Modified Apps (24h)</h3>
+                    <div id="topApps" class="space-y-2">
+                        <div class="text-gray-500 dark:text-gray-400">Loading...</div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">🐳 Recent Images</h3>
+                    <div id="recentImages" class="space-y-2">
+                        <div class="text-gray-500 dark:text-gray-400">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline Modal -->
+    <div id="timelineModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full m-4 max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white" id="timelineTitle">Change Timeline</h3>
+                    <button onclick="closeTimeline()" class="text-gray-400 hover:text-gray-600">✕</button>
+                </div>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1">
+                <div id="timelineContent" class="space-y-4">
+                    Loading timeline...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
