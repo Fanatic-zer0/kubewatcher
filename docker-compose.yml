@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  k8watch:
+    build: .
+    container_name: k8watch
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount your kubeconfig
+      - ~/.kube/config:/root/.kube/config:ro
+      # Persist SQLite database
+      - ./data:/data
+    environment:
+      - KUBECONFIG=/root/.kube/config
+    command: ["--kubeconfig", "/root/.kube/config", "--db", "/data/events.db", "--addr", ":8080"]
+    restart: unless-stopped
