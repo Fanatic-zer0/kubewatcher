@@ -1,4 +1,4 @@
-# K8Watch - Kubernetes Change Tracker
+# Kubewatcher - Kubernetes Change Tracker
 
 A lightweight, read-only Kubernetes change tracking tool for SREs and DevOps teams who want change visibility without the overhead of Grafana/Prometheus.
 
